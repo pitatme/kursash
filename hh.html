@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Загрузка музыки</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500&display=swap');
+
+    body {
+      font-family: 'Orbitron', sans-serif;
+      color: #fff;
+      padding: 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+      position: relative;
+      overflow: hidden;
+      background: linear-gradient(135deg, #1a1a1a, #330066);
+      flex-direction: column;
+    }
+
+    .site-title {
+      font-size: 3rem;
+      margin-bottom: 1rem;
+      color: #aaddff;
+      text-shadow: 0 0 10px rgba(170, 221, 255, 0.6);
+      z-index: 2;
+    }
+
+    .logo-container {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      z-index: 5;
+    }
+
+    .logo-container img {
+      width: 60px;
+      height: 60px;
+      transition: transform 0.3s ease;
+      cursor: pointer;
+    }
+
+    .logo-container img:hover {
+      transform: scale(1.1);
+    }
+
+    .logo-container a::after {
+      content: 'Instagram: @pitatme';
+      position: absolute;
+      top: 70px;
+      left: 0;
+      background: rgba(0, 0, 0, 0.8);
+      color: #aaddff;
+      padding: 5px 10px;
+      border-radius: 5px;
+      font-size: 0.9rem;
+      opacity: 0;
+      transition: opacity 0.3s;
+      pointer-events: none;
+    }
+
+    .logo-container a:hover::after {
+      opacity: 1;
+    }
+
+    canvas#visualizer {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: -3;
+    }
+
+    #bgVideo {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      z-index: -2;
+      filter: brightness(0.5) saturate(1.5) hue-rotate(30deg);
+    }
+
+    .overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.4);
+      z-index: -1;
+    }
+
+    .upload-box {
+      background: rgba(0, 0, 0, 0.6);
+      padding: 2rem;
+      border-radius: 15px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+      max-width: 400px;
+      width: 100%;
+      text-align: center;
+      position: relative;
+      z-index: 1;
+    }
+
+    h2 {
+      margin-bottom: 1rem;
+      font-size: 1.5rem;
+      color: #aaddff;
+      position: relative;
+      z-index: 1;
+    }
+
+    input[type="file"] {
+      margin-top: 1rem;
+      background: #aaddff;
+      color: #000;
+      border: none;
+      padding: 0.5rem;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background 0.3s;
+      position: relative;
+      z-index: 1;
+    }
+
+    input[type="file"]:hover {
+      background: #88ccee;
+    }
+
+    audio {
+      margin-top: 2rem;
+      width: 100%;
+      filter: drop-shadow(0 0 5px #aaddff);
+      animation: glow 2s infinite alternate;
+      position: relative;
+      z-index: 1;
+    }
+
+    @keyframes glow {
+      from {
+        filter: drop-shadow(0 0 5px #aaddff);
+      }
+      to {
+        filter: drop-shadow(0 0 15px #aaddff);
+      }
+    }
+
+    #coverPreview {
+      margin-top: 1rem;
+      width: 100%;
+      max-height: 250px;
+      object-fit: cover;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(170, 221, 255, 0.5);
+      transition: transform 0.3s ease;
+    }
+
+    #coverPreview:hover {
+      transform: scale(1.03);
+    }
+  </style>
+</head>
+<body>
+  <canvas id="visualizer"></canvas>
+  <video id="bgVideo" muted loop>
+    <source src="https://www.videvo.net/videvo_files/converted/2016_08/preview/160710A_015_Fireworks_1080p.mp492258.webm" type="video/webm">
+    Ваш браузер не поддерживает видео фон.
+  </video>
+  <div class="overlay"></div>
+
+  <div class="logo-container">
+    <a href="https://www.instagram.com/pitatme/" target="_blank">
+      <img src="https://cdn-icons-png.flaticon.com/512/616/616408.png" alt="Логотип мишки">
+    </a>
+  </div>
+
+  <div class="site-title">pitat</div>
+
+  <div class="upload-box">
+    <h2>Загрузите музыкальный файл</h2>
+    <input type="file" id="musicInput" accept="audio/*">
+
+    <h2 style="margin-top: 2rem">Загрузите обложку</h2>
+    <input type="file" id="coverInput" accept="image/*">
+    <img id="coverPreview" src="" alt="Обложка трека" style="display:none">
+
+    <audio id="audioPlayer" controls></audio>
+  </div>
+
+  <script>
+    const musicInput = document.getElementById('musicInput');
+    const coverInput = document.getElementById('coverInput');
+    const audioPlayer = document.getElementById('audioPlayer');
+    const coverPreview = document.getElementById('coverPreview');
+    const bgVideo = document.getElementById('bgVideo');
+    const canvas = document.getElementById('visualizer');
+    const ctx = canvas.getContext('2d');
+
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    let audioContext, analyser, source, dataArray;
+
+    function setupVisualizer() {
+      audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      analyser = audioContext.createAnalyser();
+      source = audioContext.createMediaElementSource(audioPlayer);
+      source.connect(analyser);
+      analyser.connect(audioContext.destination);
+      analyser.fftSize = 256;
+
+      const bufferLength = analyser.frequencyBinCount;
+      dataArray = new Uint8Array(bufferLength);
+
+      function draw() {
+        requestAnimationFrame(draw);
+
+        analyser.getByteFrequencyData(dataArray);
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        const barWidth = (canvas.width / bufferLength) * 2.5;
+        let barHeight;
+        let x = 0;
+
+        for (let i = 0; i < bufferLength; i++) {
+          barHeight = dataArray[i];
+
+          const r = 250;
+          const g = 250 - barHeight;
+          const b = 50 + barHeight;
+
+          ctx.fillStyle = `rgb(${r},${g},${b})`;
+          ctx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
+
+          x += barWidth + 1;
+        }
+      }
+      draw();
+    }
+
+    musicInput.addEventListener('change', function(event) {
+      const file = event.target.files[0];
+      if (file) {
+        const url = URL.createObjectURL(file);
+        audioPlayer.src = url;
+        audioPlayer.play();
+        bgVideo.play();
+        audioPlayer.setAttribute('data-title', file.name);
+      }
+    });
+
+    coverInput.addEventListener('change', function(event) {
+      const file = event.target.files[0];
+      if (file) {
+        const url = URL.createObjectURL(file);
+        coverPreview.src = url;
+        coverPreview.style.display = 'block';
+      }
+    });
+
+    audioPlayer.addEventListener('play', () => {
+      if (!audioContext) setupVisualizer();
+      bgVideo.play();
+    });
+
+    audioPlayer.addEventListener('pause', () => {
+      bgVideo.pause();
+    });
+
+    audioPlayer.addEventListener('ended', () => {
+      bgVideo.pause();
+      bgVideo.currentTime = 0;
+    });
+
+    // Update title and favicon on music load
+    audioPlayer.addEventListener('loadedmetadata', () => {
+      const trackName = audioPlayer.getAttribute('data-title') || 'Музыка';
+      document.title = `🎵 ${trackName}`;
+
+      const canvasFavicon = document.createElement('canvas');
+      canvasFavicon.width = 64;
+      canvasFavicon.height = 64;
+      const ctxFavicon = canvasFavicon.getContext('2d');
+      ctxFavicon.fillStyle = '#330066';
+      ctxFavicon.fillRect(0, 0, 64, 64);
+      ctxFavicon.fillStyle = '#aaddff';
+      ctxFavicon.font = 'bold 32px sans-serif';
+      ctxFavicon.textAlign = 'center';
+      ctxFavicon.textBaseline = 'middle';
+      ctxFavicon.fillText('🎵', 32, 34);
+
+      const favicon = document.querySelector("link[rel*='icon']") || document.createElement('link');
+      favicon.type = 'image/png';
+      favicon.rel = 'icon';
+      favicon.href = canvasFavicon.toDataURL('image/png');
+      document.head.appendChild(favicon);
+    });
+  </script>
+
+<div id="passwordOverlay" style="position:fixed;top:0;left:0;width:100%;height:100%;background:#000;display:flex;align-items:center;justify-content:center;z-index:9999;">
+  <div style="text-align:center;color:#aaddff;font-family:'Orbitron',sans-serif;">
+    <h2>Введите пароль</h2>
+    <input type="password" id="passwordInput" style="padding:0.5rem;border-radius:5px;border:none;">
+    <br><br>
+    <button onclick="checkPassword()" style="padding:0.5rem 1rem;border:none;border-radius:5px;background:#aaddff;color:#000;cursor:pointer;">Войти</button>
+    <p id="errorText" style="color:red;display:none;margin-top:1rem;">Неверный пароль</p>
+  </div>
+</div>
+
+<script>
+  function checkPassword() {
+    const input = document.getElementById('passwordInput').value;
+    const correctPassword = 'asd123'; // тут можно поменять пароль
+    if (input === correctPassword) {
+      document.getElementById('passwordOverlay').style.display = 'none';
+    } else {
+      document.getElementById('errorText').style.display = 'block';
+    }
+  }
+</script>
+
+</body>
+</html>
